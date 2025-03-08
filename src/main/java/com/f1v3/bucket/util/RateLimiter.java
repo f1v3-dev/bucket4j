@@ -25,5 +25,4 @@ public class RateLimiter {
 
         return bucket.tryConsumeAndReturnRemaining(1);
     }
-
 }

@@ -28,19 +28,19 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
         String clientKey = request.getRemoteAddr();
 
-        ConsumptionProbe prob = rateLimiter.checkRateLimit(clientKey);
+        // todo: 남아있는 토큰의 수도 반환해서 로그 처리
+        ConsumptionProbe probe = rateLimiter.checkRateLimit(clientKey);
 
-        if (prob.isConsumed()) {
-            response.addHeader("X-Rate-Limit-Remaining", Long.toString(prob.getRemainingTokens()));
-            log.info("Success to consume 1 token !");
+        if (probe.isConsumed()) {
+            long remainingTokens = probe.getRemainingTokens();
+            response.addHeader("X-Rate-Limit-Remaining", Long.toString(remainingTokens));
+            log.info("Success to consume 1 token! Remaining tokens: {}", remainingTokens);
             return true;
         }
 
 
         response.setStatus(429);
         log.info("Failed to consume 1 token !");
-        return true;
+        return false;
     }
-
-
 }
