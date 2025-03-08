@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.io.IOException;
+
 /**
  * Rate Limit Interceptor Class.
  *
@@ -26,21 +28,43 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
 
-        String clientKey = request.getRemoteAddr();
-
-        // todo: 남아있는 토큰의 수도 반환해서 로그 처리
+        String clientKey = request.getRemoteAddr(); // 클라이언트 IP 기반 키
         ConsumptionProbe probe = rateLimiter.checkRateLimit(clientKey);
 
         if (probe.isConsumed()) {
-            long remainingTokens = probe.getRemainingTokens();
-            response.addHeader("X-Rate-Limit-Remaining", Long.toString(remainingTokens));
-            log.info("Success to consume 1 token! Remaining tokens: {}", remainingTokens);
+            handleAllowedRequest(response, probe);
             return true;
         }
 
-
-        response.setStatus(429);
-        log.info("Failed to consume 1 token !");
+        handleRateLimitedRequest(response, probe);
         return false;
+
+    }
+
+    /**
+     * 허용된 요청 처리
+     *
+     * @param response HttpServletResponse
+     * @param probe    ConsumptionProbe
+     */
+    private void handleAllowedRequest(HttpServletResponse response, ConsumptionProbe probe) {
+        long remainingTokens = probe.getRemainingTokens();
+        response.addHeader("X-Rate-Limit-Remaining", Long.toString(remainingTokens));
+        log.info("Success to consume 1 token! Remaining tokens: {}", remainingTokens);
+    }
+
+    /**
+     * 거부된 요청 처리
+     *
+     * @param response HttpServletResponse
+     * @param probe    ConsumptionProbe
+     */
+    private void handleRateLimitedRequest(HttpServletResponse response, ConsumptionProbe probe)
+            throws IOException {
+        long waitTime = probe.getNanosToWaitForRefill() / 1_000_000_000; // 나노초 → 초 변환
+        response.setStatus(429);
+        response.addHeader("X-Rate-Limit-Retry-After-Seconds", Long.toString(waitTime)); // 재시도 대기 시간
+        response.getWriter().write("Rate limit exceeded. Try again in " + waitTime + " seconds.");
+        log.warn("Failed to consume 1 token! Wait time: {} seconds", waitTime);
     }
 }
