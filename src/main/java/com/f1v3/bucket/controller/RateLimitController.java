@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class RateLimitController {
 
     @GetMapping
-    public ResponseEntity<Void> testRateLimit() {
+    public ResponseEntity<String> testRateLimit() {
         log.info("check rate limited api");
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok().body("API 호출 성공!");
     }
 }
